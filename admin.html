@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en" class="antialiased">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>EventFlow — Private Admin Console</title>
+
+  <!-- Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+
+  <!-- Supabase JS Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    :root {
+      --bg-canvas: #F5F5F7;
+      --bg-card: #FFFFFF;
+      --bg-elevated: #EFEFF2;
+      --border-subtle: #DFDFE5;
+      --ink-primary: #111114;
+      --ink-secondary: #52525B;
+      --ink-muted: #71717A;
+      --accent: #18181B;
+      --accent-fg: #FFFFFF;
+    }
+
+    html.dark {
+      --bg-canvas: #09090B;
+      --bg-card: #111114;
+      --bg-elevated: #18181C;
+      --border-subtle: #26262C;
+      --ink-primary: #F4F4F5;
+      --ink-secondary: #A1A1AA;
+      --ink-muted: #71717A;
+      --accent: #F4F4F5;
+      --accent-fg: #09090B;
+    }
+
+    body {
+      background-color: var(--bg-canvas);
+      color: var(--ink-primary);
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    .matte-card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .matte-elevated {
+      background-color: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .matte-input {
+      background-color: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+      color: var(--ink-primary);
+      min-height: 44px;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .matte-input:focus {
+      outline: none;
+      border-color: #10B981;
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.14);
+    }
+
+    .btn-primary {
+      background-color: var(--accent);
+      color: var(--accent-fg);
+      min-height: 42px;
+      transition: transform 0.12s ease, opacity 0.15s ease;
+    }
+
+    .btn-primary:active {
+      transform: scale(0.985);
+    }
+
+    /* Prevent Mobile Auto-Zoom on Input Focus */
+    @media (max-width: 768px) {
+      input, select, textarea {
+        font-size: 16px !important;
+      }
+    }
+
+    @keyframes livePulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .live-dot {
+      animation: livePulse 1.8s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- ==================== TOP ADMIN HEADER ==================== -->
+  <header class="sticky top-0 z-40 border-b border-[var(--border-subtle)] bg-[var(--bg-card)]/90 backdrop-blur-md">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-2.5">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div class="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+        </div>
+        <div class="min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-bold text-sm tracking-tight">EventFlow Admin</span>
+            <span id="sb-status-badge" class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-mono matte-elevated text-[var(--ink-secondary)]">
+              <span id="sb-status-dot" class="w-1.5 h-1.5 rounded-full bg-amber-500 live-dot"></span>
+              <span id="sb-status-text">LOCAL MODE</span>
+            </span>
+          </div>
+          <p class="text-[11px] text-[var(--ink-muted)] truncate">Private Registration Control Center</p>
+        </div>
+      </div>
+
+      <!-- Top-Right Supabase Connect Button & Lock -->
+      <div class="flex items-center gap-2 shrink-0">
+        <button type="button" data-action="open-supabase-modal"
+          class="px-3 py-2 rounded-xl matte-elevated hover:border-emerald-500/50 transition text-xs font-semibold flex items-center gap-1.5">
+          <span id="sb-btn-dot" class="w-2 h-2 rounded-full bg-amber-500"></span>
+          <span>Supabase</span>
+        </button>
+
+        <button type="button" id="header-lock-btn" data-action="admin-logout"
+          class="hidden px-3 py-2 rounded-xl matte-elevated text-xs font-semibold text-rose-500 hover:opacity-80 transition">
+          Lock
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== MAIN ADMIN VIEWPORT ==================== -->
+  <main class="flex-1 max-w-5xl w-full mx-auto px-4 pt-6 pb-20">
+
+    <!-- 1. PRIVATE LOGIN GATE -->
+    <div id="admin-login-gate" class="max-w-md mx-auto mt-8">
+      <div class="matte-card rounded-3xl p-6 sm:p-7 shadow-sm">
+        <div class="w-10 h-10 rounded-2xl matte-elevated flex items-center justify-center mb-4 text-emerald-600 dark:text-emerald-400">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+        </div>
+
+        <h1 class="text-xl font-bold tracking-tight">Admin Sign In</h1>
+        <p class="text-xs text-[var(--ink-secondary)] mt-1 mb-5 leading-relaxed">
+          Enter your admin PIN or password to access real-time Page 1 attendee registrations.
+        </p>
+
+        <form id="admin-login-form" class="space-y-3.5">
+          <div>
+            <label for="admin-credential-input" class="block text-xs font-semibold mb-1.5">PIN or Password</label>
+            <input type="password" id="admin-credential-input" required placeholder="PIN: 1234 or Pass: admin123"
+              class="w-full px-3.5 py-2.5 rounded-2xl matte-input text-sm font-mono" />
+          </div>
+          <div id="admin-login-error" class="hidden text-xs text-rose-500 font-medium">
+            Invalid credentials. Use PIN <span class="font-mono font-bold">1234</span> or <span class="font-mono font-bold">admin123</span>.
+          </div>
+          <button type="submit" class="w-full btn-primary rounded-2xl font-semibold text-sm shadow-sm">
+            Unlock Dashboard
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- 2. UNLOCKED ADMIN WORKSPACE -->
+    <div id="admin-workspace" class="hidden space-y-5">
+
+      <!-- 4 KPI Cards (Start at 0) -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div class="matte-card rounded-2xl p-4">
+          <div class="text-[11px] font-mono uppercase text-[var(--ink-muted)]">Total Registered</div>
+          <div id="kpi-total-reg" class="text-2xl font-mono font-bold mt-1">0</div>
+        </div>
+        <div class="matte-card rounded-2xl p-4">
+          <div class="text-[11px] font-mono uppercase text-[var(--ink-muted)]">Companies</div>
+          <div id="kpi-unique-comp" class="text-2xl font-mono font-bold mt-1">0</div>
+        </div>
+        <div class="matte-card rounded-2xl p-4">
+          <div class="text-[11px] font-mono uppercase text-[var(--ink-muted)]">Checked In</div>
+          <div id="kpi-checked-in" class="text-2xl font-mono font-bold text-emerald-600 dark:text-emerald-400 mt-1">0</div>
+        </div>
+        <div class="matte-card rounded-2xl p-4">
+          <div class="text-[11px] font-mono uppercase text-[var(--ink-muted)]">Events</div>
+          <div id="kpi-active-events" class="text-2xl font-mono font-bold mt-1">0</div>
+        </div>
+      </div>
+
+      <!-- Controls & Event Link Generator -->
+      <div class="matte-card rounded-3xl p-4 sm:p-5 space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-2.5">
+          <div class="flex flex-wrap items-center gap-2 flex-1 min-w-[240px]">
+            <select id="admin-event-filter" aria-label="Filter by Event"
+              class="px-3 py-2 rounded-xl matte-elevated text-xs font-semibold flex-1 max-w-xs focus:outline-none">
+            </select>
+            <button type="button" data-action="copy-event-share-link"
+              class="px-3 py-2 rounded-xl matte-elevated text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:opacity-80 transition">
+              Copy Public Event Link
+            </button>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="button" data-action="open-event-modal"
+              class="px-3.5 py-2 rounded-xl btn-primary text-xs font-semibold !min-h-[36px]">
+              + New Event
+            </button>
+            <button type="button" data-action="export-registrants-csv"
+              class="px-3 py-2 rounded-xl matte-elevated text-xs font-semibold hover:opacity-80 transition">
+              Export CSV
+            </button>
+          </div>
+        </div>
+
+        <input type="text" id="admin-search-input" placeholder="Search Name, Position, Company, or Email..."
+          class="w-full px-3.5 py-2 rounded-xl matte-input text-xs !min-h-[40px]" />
+      </div>
+
+      <!-- Real-Time Registrants Table (Page 1 Data Only) -->
+      <div class="matte-card rounded-3xl overflow-hidden shadow-sm">
+        <div class="px-4 py-3 border-b border-[var(--border-subtle)] flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 live-dot"></span>
+            <h2 class="text-xs font-bold uppercase tracking-wider font-mono text-[var(--ink-secondary)]">Live Page 1 Registrations</h2>
+          </div>
+          <span id="table-count-label" class="text-[11px] font-mono text-[var(--ink-muted)]">0 entries</span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[11px] font-mono uppercase text-[var(--ink-muted)]">
+                <th class="py-3 px-4">Name & Email</th>
+                <th class="py-3 px-4">Position</th>
+                <th class="py-3 px-4">Company</th>
+                <th class="py-3 px-4">Event</th>
+                <th class="py-3 px-4">Time</th>
+                <th class="py-3 px-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="admin-registrants-tbody" class="divide-y divide-[var(--border-subtle)] text-xs"></tbody>
+          </table>
+        </div>
+
+        <div id="admin-empty-state" class="py-14 px-4 text-center">
+          <div class="w-10 h-10 rounded-2xl matte-elevated mx-auto mb-3 flex items-center justify-center text-[var(--ink-muted)]">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
+          <p class="text-sm font-semibold">No registrations yet</p>
+          <p class="text-xs text-[var(--ink-muted)] mt-1">Registrations submitted on index.html will appear here in real time.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ==================== SUPABASE CLOUD SYNC MODAL ==================== -->
+  <div id="supabase-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+    <div class="matte-card rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl my-auto">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h3 class="text-base font-bold">Supabase Cloud Sync</h3>
+          <p class="text-[11px] text-[var(--ink-secondary)]">Connect your Supabase project to receive Page 1 registrations across all devices.</p>
+        </div>
+        <button type="button" data-action="close-modal" data-modal="supabase-modal"
+          class="w-8 h-8 rounded-full matte-elevated flex items-center justify-center text-sm font-bold">✕</button>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label for="sb-url-input" class="block text-xs font-semibold mb-1">Project URL</label>
+          <input type="url" id="sb-url-input" placeholder="https://your-project-id.supabase.co"
+            class="w-full px-3 py-2 rounded-xl matte-input text-xs font-mono" />
+        </div>
+        <div>
+          <label for="sb-key-input" class="block text-xs font-semibold mb-1">Anon / Publishable Key</label>
+          <input type="text" id="sb-key-input" placeholder="sb_publishable_... or eyJ..."
+            class="w-full px-3 py-2 rounded-xl matte-input text-xs font-mono" />
+        </div>
+
+        <div id="sb-error-box" class="hidden p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-500 font-mono"></div>
+
+        <div class="flex flex-wrap items-center gap-2 pt-1">
+          <button type="button" data-action="connect-supabase"
+            class="flex-1 btn-primary rounded-xl text-xs font-semibold !min-h-[40px]">
+            Connect & Sync
+          </button>
+          <button type="button" data-action="copy-supabase-sql"
+            class="px-3 py-2 rounded-xl matte-elevated text-xs font-semibold hover:opacity-80 transition">
+            Copy Table SQL
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== CREATE NEW EVENT MODAL ==================== -->
+  <div id="event-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="matte-card rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-base font-bold">Create New Event</h3>
+        <button type="button" data-action="close-modal" data-modal="event-modal"
+          class="w-8 h-8 rounded-full matte-elevated flex items-center justify-center text-sm font-bold">✕</button>
+      </div>
+
+      <form id="create-event-form" class="space-y-3">
+        <div>
+          <label for="new-ev-title" class="block text-xs font-semibold mb-1">Event Title</label>
+          <input type="text" id="new-ev-title" required placeholder="e.g. AI Governance Forum 2026"
+            class="w-full px-3.5 py-2 rounded-xl matte-input text-xs" />
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label for="new-ev-date" class="block text-xs font-semibold mb-1">Date & Time</label>
+            <input type="text" id="new-ev-date" required placeholder="22 Jan 2027 • 10:00 AM"
+              class="w-full px-3.5 py-2 rounded-xl matte-input text-xs" />
+          </div>
+          <div>
+            <label for="new-ev-venue" class="block text-xs font-semibold mb-1">Venue</label>
+            <input type="text" id="new-ev-venue" required placeholder="Mandarin Oriental KL"
+              class="w-full px-3.5 py-2 rounded-xl matte-input text-xs" />
+          </div>
+        </div>
+        <div>
+          <label for="new-ev-subtitle" class="block text-xs font-semibold mb-1">Short Description</label>
+          <input type="text" id="new-ev-subtitle" placeholder="Brief summary shown on the event landing page"
+            class="w-full px-3.5 py-2 rounded-xl matte-input text-xs" />
+        </div>
+        <div class="pt-2 flex gap-2">
+          <button type="submit" class="flex-1 btn-primary rounded-xl text-xs font-semibold">Publish Event</button>
+          <button type="button" data-action="close-modal" data-modal="event-modal"
+            class="px-4 py-2 rounded-xl matte-elevated text-xs font-semibold">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== TOAST NOTIFICATION ==================== -->
+  <div id="toast-banner" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-full bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs font-semibold shadow-xl flex items-center gap-2 whitespace-nowrap">
+    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+    <span id="toast-message">Saved</span>
+  </div>
+
+  <!-- ==================== ADMIN CONSOLE SCRIPT ==================== -->
+  <script>
+    (function () {
+      'use strict';
+
+      // 1. AUTOMATIC MATTE WHITE / MATTE BLACK SYSTEM THEME
+      const darkMedia = window.matchMedia('(prefers-color-scheme: dark)');
+      const applyTheme = (e) => document.documentElement.classList.toggle('dark', e.matches);
+      applyTheme(darkMedia);
+      if (darkMedia.addEventListener) darkMedia.addEventListener('change', applyTheme);
+
+      // 2. SHARED STORAGE KEYS & REAL-TIME CHANNEL
+      const STORAGE_KEY_EVENTS = 'eventflow_events_v1';
+      const STORAGE_KEY_REGS = 'eventflow_registrations_v1';
+      const STORAGE_KEY_SB = 'eventflow_supabase_cfg_v1';
+      const ADMIN_SESSION_KEY = 'eventflow_admin_unlocked';
+      const channel = ('BroadcastChannel' in window) ? new BroadcastChannel('eventflow_realtime_sync') : null;
+
+      const SUPABASE_SQL = `grant usage on schema public to anon, authenticated;
+
+create table if not exists public.event_registrations (
+  id text primary key,
+  event_slug text not null,
+  name text not null,
+  position text not null,
+  company text not null,
+  email text not null,
+  checked_in boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+grant all on table public.event_registrations to anon, authenticated;
+alter table public.event_registrations enable row level security;
+
+drop policy if exists "Public can insert registrations" on public.event_registrations;
+create policy "Public can insert registrations"
+  on public.event_registrations for insert
+  to anon, authenticated
+  with check (true);
+
+drop policy if exists "Admin full read/update/delete" on public.event_registrations;
+create policy "Admin full read/update/delete"
+  on public.event_registrations for all
+  to anon, authenticated
+  using (true)
+  with check (true);
+
+notify pgrst, 'reload schema';`;
+
+      // Clean empty state on first launch: zero pre-filled sample events or registrations
+      let state = {
+        events: [],
+        registrations: [],
+        filterEvent: 'ALL',
+        search: '',
+        supabaseClient: null,
+        supabaseConnected: false,
+        sbUrl: '',
+        sbKey: ''
+      };
+
+      function loadArrayJSON(key) {
+        try {
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) return parsed;
+          }
+        } catch (e) {}
+        return [];
+      }
+
+      function escapeHTML(str) {
+        return String(str || '').replace(/[&<>"']/g, m => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;'
+        }[m]));
+      }
+
+      let toastTimer = null;
+      function showToast(msg) {
+        const banner = document.getElementById('toast-banner');
+        const label = document.getElementById('toast-message');
+        if (!banner || !label) return;
+        label.textContent = msg;
+        banner.classList.remove('hidden');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => banner.classList.add('hidden'), 2600);
+      }
+
+      function renderDashboard() {
+        const unlocked = sessionStorage.getItem(ADMIN_SESSION_KEY) === 'true';
+        document.getElementById('admin-login-gate').classList.toggle('hidden', unlocked);
+        document.getElementById('admin-workspace').classList.toggle('hidden', !unlocked);
+        document.getElementById('header-lock-btn').classList.toggle('hidden', !unlocked);
+        if (!unlocked) return;
+
+        // Populate Event Filter Dropdown
+        const filterSel = document.getElementById('admin-event-filter');
+        filterSel.innerHTML = `<option value="ALL">All Events (${state.registrations.length})</option>` +
+          state.events.map(ev => {
+            const count = state.registrations.filter(r => r.eventSlug === ev.slug).length;
+            return `<option value="${escapeHTML(ev.slug)}" ${state.filterEvent === ev.slug ? 'selected' : ''}>${escapeHTML(ev.title)} (${count})</option>`;
+          }).join('');
+
+        // Filter Registrants
+        const q = state.search.trim().toLowerCase();
+        const filtered = state.registrations.filter(r => {
+          const matchesEvent = state.filterEvent === 'ALL' || r.eventSlug === state.filterEvent;
+          const matchesSearch = !q || [r.name, r.position, r.company, r.email].some(v => (v || '').toLowerCase().includes(q));
+          return matchesEvent && matchesSearch;
+        });
+
+        // Update 4 KPI Cards
+        document.getElementById('kpi-total-reg').textContent = filtered.length;
+        const uniqueCompanies = new Set(
+          filtered.map(r => (r.company || '').trim().toLowerCase()).filter(Boolean)
+        ).size;
+        document.getElementById('kpi-unique-comp').textContent = uniqueCompanies;
+        document.getElementById('kpi-checked-in').textContent = filtered.filter(r => r.checkedIn).length;
+        document.getElementById('kpi-active-events').textContent = state.events.length;
+        document.getElementById('table-count-label').textContent = `${filtered.length} ${filtered.length === 1 ? 'entry' : 'entries'}`;
+
+        // Render Registrants Table
+        const tbody = document.getElementById('admin-registrants-tbody');
+        const emptyState = document.getElementById('admin-empty-state');
+
+        if (filtered.length === 0) {
+          tbody.innerHTML = '';
+          emptyState.classList.remove('hidden');
+          return;
+        }
+
+        emptyState.classList.add('hidden');
+        tbody.innerHTML = filtered.map(r => `
+          <tr class="hover:bg-[var(--bg-elevated)]/60 transition">
+            <td class="py-3 px-4">
+              <div class="font-bold text-[var(--ink-primary)]">${escapeHTML(r.name)}</div>
+              <div class="font-mono text-[11px] text-[var(--ink-secondary)]">${escapeHTML(r.email)}</div>
+            </td>
+            <td class="py-3 px-4 font-medium">${escapeHTML(r.position)}</td>
+            <td class="py-3 px-4">
+              <span class="px-2 py-0.5 rounded-lg matte-elevated font-medium">${escapeHTML(r.company)}</span>
+            </td>
+            <td class="py-3 px-4 font-mono text-[11px] text-[var(--ink-secondary)]">${escapeHTML(r.eventSlug)}</td>
+            <td class="py-3 px-4 font-mono text-[11px] text-[var(--ink-muted)]">
+              ${new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </td>
+            <td class="py-3 px-4 text-right whitespace-nowrap">
+              <button type="button" data-action="toggle-checkin" data-reg-id="${escapeHTML(r.id)}"
+                class="px-2.5 py-1 rounded-lg text-[11px] font-semibold mr-1 transition ${r.checkedIn ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'matte-elevated hover:opacity-80'}">
+                ${r.checkedIn ? '✓ Checked In' : 'Check In'}
+              </button>
+              <button type="button" data-action="delete-reg" data-reg-id="${escapeHTML(r.id)}"
+                class="px-2 py-1 rounded-lg text-[11px] font-semibold text-rose-500 hover:bg-rose-500/10 transition"
+                title="Remove entry">✕</button>
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      async function connectSupabase(rawUrl, rawKey, silent = false) {
+        const errBox = document.getElementById('sb-error-box');
+        errBox.classList.add('hidden');
+        const url = (rawUrl || '').trim().replace(/\/+$/, '');
+        const key = (rawKey || '').trim();
+
+        if (!url || !key) {
+          errBox.textContent = 'Enter both Project URL and Anon / Publishable Key.';
+          errBox.classList.remove('hidden');
+          return;
+        }
+
+        try {
+          if (!window.supabase) throw new Error('Supabase client library failed to load.');
+          const client = window.supabase.createClient(url, key);
+          const { data, error } = await client
+            .from('event_registrations')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (error) throw error;
+
+          state.supabaseClient = client;
+          state.supabaseConnected = true;
+          state.sbUrl = url;
+          state.sbKey = key;
+          localStorage.setItem(STORAGE_KEY_SB, JSON.stringify({ url, key }));
+
+          if (Array.isArray(data)) {
+            state.registrations = data.map(row => ({
+              id: row.id,
+              eventSlug: row.event_slug,
+              name: row.name,
+              position: row.position,
+              company: row.company,
+              email: row.email,
+              checkedIn: !!row.checked_in,
+              createdAt: row.created_at
+            }));
+            localStorage.setItem(STORAGE_KEY_REGS, JSON.stringify(state.registrations));
+          }
+
+          // Subscribe to Real-Time Inserts / Updates / Deletes
+          client.channel('public:event_registrations')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'event_registrations' }, async () => {
+              const { data: fresh } = await client
+                .from('event_registrations')
+                .select('*')
+                .order('created_at', { ascending: false });
+              if (Array.isArray(fresh)) {
+                state.registrations = fresh.map(row => ({
+                  id: row.id,
+                  eventSlug: row.event_slug,
+                  name: row.name,
+                  position: row.position,
+                  company: row.company,
+                  email: row.email,
+                  checkedIn: !!row.checked_in,
+                  createdAt: row.created_at
+                }));
+                localStorage.setItem(STORAGE_KEY_REGS, JSON.stringify(state.registrations));
+                renderDashboard();
+                showToast('New live registration received!');
+              }
+            })
+            .subscribe();
+
+          document.getElementById('sb-status-text').textContent = 'SUPABASE LIVE';
+          document.getElementById('sb-status-dot').className = 'w-1.5 h-1.5 rounded-full bg-emerald-500 live-dot';
+          document.getElementById('sb-btn-dot').className = 'w-2 h-2 rounded-full bg-emerald-500';
+
+          if (!silent) {
+            document.getElementById('supabase-modal').classList.add('hidden');
+            showToast('Supabase Connected!');
+          }
+          renderDashboard();
+        } catch (err) {
+          errBox.textContent = `[${err.code || 'ERR'}] ${err.message || 'Connection failed. Run Copy Table SQL in Supabase first.'}`;
+          errBox.classList.remove('hidden');
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', async () => {
+        // Load stored events & registrations without injecting any pre-filled sample data
+        state.events = loadArrayJSON(STORAGE_KEY_EVENTS);
+        state.registrations = loadArrayJSON(STORAGE_KEY_REGS);
+
+        // Login Form Handler
+        document.getElementById('admin-login-form').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const val = document.getElementById('admin-credential-input').value.trim();
+          if (val === '1234' || val === 'admin123') {
+            sessionStorage.setItem(ADMIN_SESSION_KEY, 'true');
+            document.getElementById('admin-login-error').classList.add('hidden');
+            document.getElementById('admin-credential-input').value = '';
+            renderDashboard();
+            showToast('Admin Console Unlocked');
+          } else {
+            document.getElementById('admin-login-error').classList.remove('hidden');
+          }
+        });
+
+        // Filter & Search Listeners
+        document.getElementById('admin-event-filter').addEventListener('change', (e) => {
+          state.filterEvent = e.target.value;
+          renderDashboard();
+        });
+
+        document.getElementById('admin-search-input').addEventListener('input', (e) => {
+          state.search = e.target.value;
+          renderDashboard();
+        });
+
+        // Create New Event Form
+        document.getElementById('create-event-form').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const title = document.getElementById('new-ev-title').value.trim();
+          const date = document.getElementById('new-ev-date').value.trim();
+          const venue = document.getElementById('new-ev-venue').value.trim();
+          const subtitle = document.getElementById('new-ev-subtitle').value.trim() || 'Official event registration portal.';
+          const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Math.floor(100 + Math.random() * 900);
+
+          state.events.unshift({
+            id: 'ev-' + Date.now(),
+            slug,
+            title,
+            subtitle,
+            date,
+            venue,
+            capacity: 120,
+            company: {
+              name: 'Nexus Enterprise Solutions Sdn Bhd',
+              email: 'events@nexusenterprise.my',
+              address: 'Level 28, Menara Prestige, No. 1 Jalan Pinang, 50450 Kuala Lumpur, Malaysia',
+              about: 'Enterprise Event Organizer.'
+            },
+            itinerary: [
+              { time: '09:00 AM', title: 'Registration & Opening Keynote', speaker: 'Host Team', room: venue }
+            ],
+            collaterals: [
+              { id: 'col-' + Date.now(), title: `${title} — Presentation Slides`, type: 'PDF SLIDES', size: '3.2 MB', summary: 'Official session slides and schedule.' }
+            ]
+          });
+
+          try {
+            localStorage.setItem(STORAGE_KEY_EVENTS, JSON.stringify(state.events));
+            if (channel) channel.postMessage({ type: 'EVENTS_UPDATED' });
+          } catch (err) {}
+
+          document.getElementById('event-modal').classList.add('hidden');
+          e.target.reset();
+          renderDashboard();
+          showToast('New event published!');
+        });
+
+        // Global Delegated Button Handler
+        document.addEventListener('click', async (e) => {
+          const btn = e.target.closest('[data-action]');
+          if (!btn) return;
+          const act = btn.getAttribute('data-action');
+
+          if (act === 'open-supabase-modal') {
+            document.getElementById('supabase-modal').classList.remove('hidden');
+          } else if (act === 'open-event-modal') {
+            document.getElementById('event-modal').classList.remove('hidden');
+          } else if (act === 'close-modal') {
+            document.getElementById(btn.getAttribute('data-modal')).classList.add('hidden');
+          } else if (act === 'admin-logout') {
+            sessionStorage.removeItem(ADMIN_SESSION_KEY);
+            renderDashboard();
+            showToast('Admin Console Locked');
+          } else if (act === 'copy-supabase-sql') {
+            const ta = document.createElement('textarea');
+            ta.value = SUPABASE_SQL;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            showToast('Copied Supabase SQL');
+          } else if (act === 'connect-supabase') {
+            await connectSupabase(
+              document.getElementById('sb-url-input').value,
+              document.getElementById('sb-key-input').value
+            );
+          } else if (act === 'copy-event-share-link') {
+            const slug = state.filterEvent !== 'ALL' ? state.filterEvent : (state.events[0]?.slug || '');
+            const base = window.location.href.replace(/admin\.html.*$/, 'index.html');
+            const u = new URL(base);
+            if (slug) {
+              u.searchParams.set('event', slug);
+            }
+            if (state.supabaseConnected) {
+              u.searchParams.set('sb_url', state.sbUrl);
+              u.searchParams.set('sb_key', state.sbKey);
+            }
+            const ta = document.createElement('textarea');
+            ta.value = u.toString();
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            showToast('Copied Public Event Link');
+          } else if (act === 'export-registrants-csv') {
+            const rows = [
+              ['ID', 'Name', 'Position', 'Company', 'Email', 'Event', 'CheckedIn', 'Time'].join(','),
+              ...state.registrations.map(r =>
+                [r.id, r.name, r.position, r.company, r.email, r.eventSlug, r.checkedIn, r.createdAt]
+                  .map(v => `"${String(v || '').replace(/"/g, '""')}"`)
+                  .join(',')
+              )
+            ];
+            const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'Registrants.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('Exported Registrants.csv');
+          } else if (act === 'toggle-checkin') {
+            const reg = state.registrations.find(x => x.id === btn.getAttribute('data-reg-id'));
+            if (reg) {
+              reg.checkedIn = !reg.checkedIn;
+              try {
+                localStorage.setItem(STORAGE_KEY_REGS, JSON.stringify(state.registrations));
+                if (channel) channel.postMessage({ type: 'REGISTRATIONS_UPDATED' });
+              } catch (err) {}
+              if (state.supabaseConnected && state.supabaseClient) {
+                await state.supabaseClient.from('event_registrations').update({ checked_in: reg.checkedIn }).eq('id', reg.id);
+              }
+              renderDashboard();
+              showToast(reg.checkedIn ? `${reg.name} checked in` : 'Check-in reverted');
+            }
+          } else if (act === 'delete-reg') {
+            const id = btn.getAttribute('data-reg-id');
+            state.registrations = state.registrations.filter(x => x.id !== id);
+            try {
+              localStorage.setItem(STORAGE_KEY_REGS, JSON.stringify(state.registrations));
+              if (channel) channel.postMessage({ type: 'REGISTRATIONS_UPDATED' });
+            } catch (err) {}
+            if (state.supabaseConnected && state.supabaseClient) {
+              await state.supabaseClient.from('event_registrations').delete().eq('id', id);
+            }
+            renderDashboard();
+            showToast('Registration removed');
+          }
+        });
+
+        // Listen for Live Registrations from index.html
+        if (channel) {
+          channel.onmessage = () => {
+            state.events = loadArrayJSON(STORAGE_KEY_EVENTS);
+            state.registrations = loadArrayJSON(STORAGE_KEY_REGS);
+            renderDashboard();
+            showToast('Live registration synced!');
+          };
+        }
+        window.addEventListener('storage', (e) => {
+          if (e.key === STORAGE_KEY_EVENTS || e.key === STORAGE_KEY_REGS) {
+            state.events = loadArrayJSON(STORAGE_KEY_EVENTS);
+            state.registrations = loadArrayJSON(STORAGE_KEY_REGS);
+            renderDashboard();
+          }
+        });
+
+        // Auto-reconnect Supabase if saved previously
+        try {
+          const rawSb = localStorage.getItem(STORAGE_KEY_SB);
+          if (rawSb) {
+            const savedSb = JSON.parse(rawSb);
+            if (savedSb && savedSb.url && savedSb.key) {
+              document.getElementById('sb-url-input').value = savedSb.url;
+              document.getElementById('sb-key-input').value = savedSb.key;
+              await connectSupabase(savedSb.url, savedSb.key, true);
+            }
+          }
+        } catch (err) {}
+
+        renderDashboard();
+      });
+    })();
+  </script>
+</body>
+</html>

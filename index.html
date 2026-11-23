@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en" class="antialiased">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Nexus Enterprise Events — Official Registration</title>
+
+  <!-- Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+
+  <!-- Supabase JS Client (Silent Background Sync When Configured) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    :root {
+      --bg-canvas: #F5F5F7;
+      --bg-card: #FFFFFF;
+      --bg-elevated: #EFEFF2;
+      --border-subtle: #DFDFE5;
+      --ink-primary: #111114;
+      --ink-secondary: #52525B;
+      --ink-muted: #71717A;
+      --accent: #18181B;
+      --accent-fg: #FFFFFF;
+      --glass-bg: rgba(255, 255, 255, 0.76);
+      --glass-border: rgba(255, 255, 255, 0.88);
+      --glass-ring: rgba(0, 0, 0, 0.08);
+      --glass-active: rgba(24, 24, 27, 0.08);
+      --glass-shadow: 0 18px 40px -10px rgba(0, 0, 0, 0.14), inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
+    }
+
+    html.dark {
+      --bg-canvas: #09090B;
+      --bg-card: #111114;
+      --bg-elevated: #18181C;
+      --border-subtle: #26262C;
+      --ink-primary: #F4F4F5;
+      --ink-secondary: #A1A1AA;
+      --ink-muted: #71717A;
+      --accent: #F4F4F5;
+      --accent-fg: #09090B;
+      --glass-bg: rgba(24, 24, 28, 0.76);
+      --glass-border: rgba(255, 255, 255, 0.14);
+      --glass-ring: rgba(0, 0, 0, 0.55);
+      --glass-active: rgba(255, 255, 255, 0.12);
+      --glass-shadow: 0 20px 44px -10px rgba(0, 0, 0, 0.65), inset 0 1px 0 0 rgba(255, 255, 255, 0.18);
+    }
+
+    body {
+      background-color: var(--bg-canvas);
+      color: var(--ink-primary);
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    .matte-card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .matte-elevated {
+      background-color: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .matte-input {
+      background-color: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+      color: var(--ink-primary);
+      min-height: 46px;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .matte-input:focus {
+      outline: none;
+      border-color: #10B981;
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.14);
+    }
+
+    .btn-primary {
+      background-color: var(--accent);
+      color: var(--accent-fg);
+      min-height: 46px;
+      transition: transform 0.12s ease, opacity 0.15s ease;
+    }
+
+    .btn-primary:active {
+      transform: scale(0.985);
+    }
+
+    /* Prevent Mobile Auto-Zoom on Focus */
+    @media (max-width: 768px) {
+      input, select, textarea {
+        font-size: 16px !important;
+      }
+    }
+
+    /* Apple Liquid Glass Floating Pill Navigation */
+    .liquid-glass-pill {
+      background: var(--glass-bg);
+      backdrop-filter: blur(28px) saturate(190%);
+      -webkit-backdrop-filter: blur(28px) saturate(190%);
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-shadow), 0 0 0 1px var(--glass-ring);
+    }
+
+    .liquid-nav-btn {
+      color: var(--ink-secondary);
+      transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .liquid-nav-btn.active {
+      background: var(--glass-active);
+      color: var(--ink-primary);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    }
+
+    .pill-bottom-lift {
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
+    }
+
+    .toast-safe-lift {
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 92px);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- ==================== PUBLIC EVENT HEADER (NO ADMIN UI) ==================== -->
+  <header class="sticky top-0 z-40 border-b border-[var(--border-subtle)] bg-[var(--bg-card)]/90 backdrop-blur-md">
+    <div class="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div class="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </div>
+        <div class="min-w-0">
+          <div id="header-brand-title" class="font-bold text-sm tracking-tight truncate">Nexus Enterprise Events</div>
+          <div class="text-[11px] text-[var(--ink-muted)] truncate">Official Event Portal</div>
+        </div>
+      </div>
+
+      <!-- Event Switcher for Multi-Event Landing Pages -->
+      <div class="flex items-center gap-1.5 shrink-0">
+        <select id="pub-event-selector" aria-label="Select Event"
+          class="px-2.5 py-1.5 rounded-xl text-xs font-medium matte-elevated text-[var(--ink-primary)] max-w-[175px] sm:max-w-[230px] truncate focus:outline-none">
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== MAIN 3-PAGE PUBLIC EVENT VIEWPORT ==================== -->
+  <main class="flex-1 max-w-2xl w-full mx-auto px-4 pt-5 pb-32">
+
+    <!-- Event Overview Hero Card -->
+    <section class="matte-card rounded-3xl p-5 sm:p-6 mb-5 shadow-sm">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          <span id="pub-spots-badge">142 Spots Left</span>
+        </span>
+        <span id="pub-event-slug-badge" class="text-[11px] font-mono text-[var(--ink-muted)]">
+          #tech-summit-2026
+        </span>
+      </div>
+
+      <h1 id="pub-event-title" class="text-xl sm:text-2xl font-bold tracking-tight leading-snug mb-2">
+        Future Enterprise Tech Summit 2026
+      </h1>
+      <p id="pub-event-subtitle" class="text-sm text-[var(--ink-secondary)] leading-relaxed mb-4">
+        An executive symposium exploring cloud architecture, applied AI workflows, and resilient digital infrastructure.
+      </p>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-3 border-t border-[var(--border-subtle)] text-xs">
+        <div class="flex items-center gap-2.5 text-[var(--ink-secondary)]">
+          <div class="w-8 h-8 rounded-xl matte-elevated flex items-center justify-center shrink-0">
+            <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <div>
+            <div class="text-[11px] text-[var(--ink-muted)]">Date & Time</div>
+            <div id="pub-event-date" class="font-mono font-medium text-[var(--ink-primary)]">14 Dec 2026 • 09:00 AM</div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2.5 text-[var(--ink-secondary)]">
+          <div class="w-8 h-8 rounded-xl matte-elevated flex items-center justify-center shrink-0">
+            <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
+          <div>
+            <div class="text-[11px] text-[var(--ink-muted)]">Venue</div>
+            <div id="pub-event-venue" class="font-medium text-[var(--ink-primary)]">KL Convention Centre, Hall 4</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== PAGE 1: REGISTRATION FORM ==================== -->
+    <section id="pub-page-register" class="pub-page-section">
+      <div class="matte-card rounded-3xl p-5 sm:p-6 shadow-sm">
+        <div class="mb-5">
+          <span class="text-[11px] font-mono uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-semibold">Page 01 • Attendee Pass</span>
+          <h2 class="text-lg font-bold tracking-tight mt-0.5">Event Registration</h2>
+          <p class="text-xs text-[var(--ink-secondary)] mt-1">Fill in your details below to secure your seat.</p>
+        </div>
+
+        <form id="public-registration-form" class="space-y-4">
+          <div>
+            <label for="reg-name" class="block text-xs font-semibold mb-1.5">Name <span class="text-rose-500">*</span></label>
+            <input type="text" id="reg-name" name="name" required placeholder="e.g. Amirul Hakim"
+              class="w-full px-3.5 py-2.5 rounded-2xl matte-input text-sm" />
+          </div>
+
+          <div>
+            <label for="reg-position" class="block text-xs font-semibold mb-1.5">Position <span class="text-rose-500">*</span></label>
+            <input type="text" id="reg-position" name="position" required placeholder="e.g. Head of Engineering"
+              class="w-full px-3.5 py-2.5 rounded-2xl matte-input text-sm" />
+          </div>
+
+          <div>
+            <label for="reg-company" class="block text-xs font-semibold mb-1.5">Company <span class="text-rose-500">*</span></label>
+            <input type="text" id="reg-company" name="company" required placeholder="e.g. Petronas Digital Sdn Bhd"
+              class="w-full px-3.5 py-2.5 rounded-2xl matte-input text-sm" />
+          </div>
+
+          <div>
+            <label for="reg-email" class="block text-xs font-semibold mb-1.5">Email <span class="text-rose-500">*</span></label>
+            <input type="email" id="reg-email" name="email" required placeholder="e.g. amirul@company.com"
+              class="w-full px-3.5 py-2.5 rounded-2xl matte-input text-sm" />
+          </div>
+
+          <div class="pt-2">
+            <button type="submit" id="reg-submit-btn"
+              class="w-full btn-primary rounded-2xl font-semibold text-sm flex items-center justify-center gap-2 shadow-sm">
+              <span>Submit Registration</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </button>
+          </div>
+        </form>
+
+        <!-- Instant Attendee Confirmation Pass -->
+        <div id="reg-confirmation-card" class="hidden mt-2">
+          <div class="rounded-2xl p-5 bg-emerald-500/10 border border-emerald-500/30">
+            <div class="flex items-center justify-between gap-2 mb-3">
+              <span class="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                Registration Confirmed
+              </span>
+              <span id="conf-pass-id" class="font-mono text-xs px-2.5 py-0.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] font-semibold">
+                #PASS-8842
+              </span>
+            </div>
+
+            <div class="space-y-1.5 text-xs border-t border-emerald-500/20 pt-3">
+              <div class="flex justify-between gap-2">
+                <span class="text-[var(--ink-secondary)]">Name</span>
+                <span id="conf-name" class="font-semibold text-right"></span>
+              </div>
+              <div class="flex justify-between gap-2">
+                <span class="text-[var(--ink-secondary)]">Position</span>
+                <span id="conf-position" class="font-medium text-right"></span>
+              </div>
+              <div class="flex justify-between gap-2">
+                <span class="text-[var(--ink-secondary)]">Company</span>
+                <span id="conf-company" class="font-medium text-right"></span>
+              </div>
+              <div class="flex justify-between gap-2">
+                <span class="text-[var(--ink-secondary)]">Email</span>
+                <span id="conf-email" class="font-mono text-right break-all"></span>
+              </div>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-emerald-500/20 flex flex-wrap gap-2">
+              <button type="button" data-action="switch-pub-page" data-page="itinerary"
+                class="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 text-white text-xs font-semibold text-center hover:bg-emerald-700 transition">
+                View Itinerary & Slides
+              </button>
+              <button type="button" data-action="reset-reg-form"
+                class="py-2.5 px-3 rounded-xl matte-card text-xs font-semibold hover:opacity-80 transition">
+                Register Another
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== PAGE 2: ITINERARY & COLLATERALS ==================== -->
+    <section id="pub-page-itinerary" class="pub-page-section hidden space-y-5">
+      <div class="matte-card rounded-3xl p-5 sm:p-6 shadow-sm">
+        <div class="mb-4">
+          <span class="text-[11px] font-mono uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-semibold">Page 02 • Schedule</span>
+          <h2 class="text-lg font-bold tracking-tight mt-0.5">Event Itinerary</h2>
+          <p class="text-xs text-[var(--ink-secondary)] mt-0.5">Session timeline and keynote speakers.</p>
+        </div>
+
+        <div id="pub-itinerary-list" class="space-y-3"></div>
+      </div>
+
+      <div class="matte-card rounded-3xl p-5 sm:p-6 shadow-sm">
+        <div class="mb-4">
+          <span class="text-[11px] font-mono uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-semibold">Resources • Files</span>
+          <h2 class="text-lg font-bold tracking-tight mt-0.5">Presentation Slides & Collaterals</h2>
+          <p class="text-xs text-[var(--ink-secondary)] mt-0.5">Preview or download event decks and guides.</p>
+        </div>
+
+        <div id="pub-collaterals-list" class="space-y-3"></div>
+      </div>
+    </section>
+
+    <!-- ==================== PAGE 3: COMPANY INFORMATION ==================== -->
+    <section id="pub-page-company" class="pub-page-section hidden">
+      <div class="matte-card rounded-3xl p-5 sm:p-6 shadow-sm">
+        <div class="mb-5">
+          <span class="text-[11px] font-mono uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-semibold">Page 03 • Organizer</span>
+          <h2 class="text-lg font-bold tracking-tight mt-0.5">Company Information</h2>
+          <p class="text-xs text-[var(--ink-secondary)] mt-0.5">Host organization and headquarters contact details.</p>
+        </div>
+
+        <div class="space-y-4">
+          <div class="matte-elevated rounded-2xl p-4">
+            <div class="text-[11px] font-mono uppercase text-[var(--ink-muted)] mb-1">Name of the Company</div>
+            <div id="pub-comp-name" class="text-base font-bold">Nexus Enterprise Solutions Sdn Bhd</div>
+            <p id="pub-comp-about" class="text-xs text-[var(--ink-secondary)] mt-1.5 leading-relaxed">
+              Leading enterprise digital transformation consultancy and organizer of executive technology forums across Southeast Asia.
+            </p>
+          </div>
+
+          <div class="matte-elevated rounded-2xl p-4 flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <div class="text-[11px] font-mono uppercase text-[var(--ink-muted)] mb-1">Email Address</div>
+              <a id="pub-comp-email-link" href="mailto:events@nexusenterprise.my" class="text-sm font-mono font-semibold text-emerald-600 dark:text-emerald-400 break-all hover:underline">
+                events@nexusenterprise.my
+              </a>
+            </div>
+            <button type="button" data-action="copy-text" data-copy-target="pub-comp-email-link"
+              class="shrink-0 px-3 py-2 rounded-xl matte-card text-xs font-semibold hover:opacity-80 transition">
+              Copy
+            </button>
+          </div>
+
+          <div class="matte-elevated rounded-2xl p-4">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <div class="text-[11px] font-mono uppercase text-[var(--ink-muted)] mb-1">HQ Address</div>
+                <p id="pub-comp-address" class="text-sm font-medium leading-relaxed">
+                  Level 28, Menara Prestige, No. 1 Jalan Pinang, 50450 Kuala Lumpur, Wilayah Persekutuan Kuala Lumpur, Malaysia
+                </p>
+              </div>
+              <button type="button" data-action="copy-text" data-copy-target="pub-comp-address"
+                class="shrink-0 px-3 py-2 rounded-xl matte-card text-xs font-semibold hover:opacity-80 transition">
+                Copy
+              </button>
+            </div>
+
+            <div class="mt-3 pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between">
+              <span class="text-[11px] text-[var(--ink-muted)] font-mono">Kuala Lumpur HQ</span>
+              <a id="pub-comp-map-link" href="https://maps.google.com/?q=Menara+Prestige+Jalan+Pinang+Kuala+Lumpur" target="_blank" rel="noopener noreferrer"
+                class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline">
+                <span>View on Maps</span>
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== FLOATING APPLE LIQUID GLASS PILL NAVIGATION ==================== -->
+    <nav aria-label="Event Pages" class="fixed left-1/2 -translate-x-1/2 pill-bottom-lift z-30 w-[92%] max-w-[390px]">
+      <div class="liquid-glass-pill rounded-full p-1.5 grid grid-cols-3 gap-1">
+        <button type="button" data-action="switch-pub-page" data-page="register" id="nav-pill-register"
+          class="liquid-nav-btn active rounded-full py-2 px-2 flex flex-col items-center justify-center gap-0.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+          <span class="text-[11px] font-semibold tracking-tight">Register</span>
+        </button>
+
+        <button type="button" data-action="switch-pub-page" data-page="itinerary" id="nav-pill-itinerary"
+          class="liquid-nav-btn rounded-full py-2 px-2 flex flex-col items-center justify-center gap-0.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <span class="text-[11px] font-semibold tracking-tight">Itinerary</span>
+        </button>
+
+        <button type="button" data-action="switch-pub-page" data-page="company" id="nav-pill-company"
+          class="liquid-nav-btn rounded-full py-2 px-2 flex flex-col items-center justify-center gap-0.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+          </svg>
+          <span class="text-[11px] font-semibold tracking-tight">Company</span>
+        </button>
+      </div>
+    </nav>
+  </main>
+
+  <!-- ==================== SLIDE DECK / COLLATERAL PREVIEW MODAL ==================== -->
+  <div id="collateral-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="matte-card rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl">
+      <div class="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <span id="modal-col-type" class="text-[11px] font-mono uppercase px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-semibold">PDF DECK</span>
+          <h3 id="modal-col-title" class="text-base font-bold mt-1.5">Keynote Presentation Slides</h3>
+        </div>
+        <button type="button" data-action="close-modal"
+          class="w-8 h-8 rounded-full matte-elevated flex items-center justify-center text-sm font-bold">✕</button>
+      </div>
+
+      <div class="rounded-2xl matte-elevated p-5 mb-4 border border-[var(--border-subtle)]">
+        <div class="aspect-video rounded-xl bg-gradient-to-br from-zinc-900 to-zinc-800 text-white p-5 flex flex-col justify-between shadow-inner">
+          <div class="flex items-center justify-between text-[10px] font-mono text-emerald-400">
+            <span>OFFICIAL PRESENTATION SLIDES</span>
+            <span id="modal-col-size">4.8 MB</span>
+          </div>
+          <div>
+            <h4 id="modal-col-slide-heading" class="text-base sm:text-lg font-bold leading-snug">Executive Architecture Briefing</h4>
+            <p id="modal-col-summary" class="text-xs text-zinc-300 mt-1.5 leading-relaxed">
+              Includes full session slides, reference architecture diagrams, and speaker notes.
+            </p>
+          </div>
+          <div class="flex items-center justify-between text-[10px] font-mono text-zinc-400 pt-2 border-t border-white/10">
+            <span>Nexus Enterprise Events</span>
+            <span>Slide 01 / 24</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2.5">
+        <button type="button" data-action="download-collateral-file"
+          class="flex-1 btn-primary rounded-2xl text-xs font-semibold flex items-center justify-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          <span>Download File</span>
+        </button>
+        <button type="button" data-action="close-modal"
+          class="px-4 py-2.5 rounded-2xl matte-elevated text-xs font-semibold">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== TOAST NOTIFICATION ==================== -->
+  <div id="toast-banner" class="hidden fixed left-1/2 -translate-x-1/2 toast-safe-lift z-50 px-4 py-2.5 rounded-full bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs font-semibold shadow-xl flex items-center gap-2 whitespace-nowrap">
+    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+    <span id="toast-message">Saved</span>
+  </div>
+
+  <!-- ==================== PUBLIC LANDING PAGE SCRIPT ==================== -->
+  <script>
+    (function () {
+      'use strict';
+
+      // 1. AUTOMATIC MATTE WHITE / MATTE BLACK SYSTEM THEME
+      const darkMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      function applySystemTheme(e) {
+        document.documentElement.classList.toggle('dark', e.matches);
+      }
+      applySystemTheme(darkMediaQuery);
+      if (darkMediaQuery.addEventListener) {
+        darkMediaQuery.addEventListener('change', applySystemTheme);
+      }
+
+      // 2. SHARED DATA KEYS & REAL-TIME SYNC CHANNEL
+      const STORAGE_KEY_EVENTS = 'eventflow_events_v1';
+      const STORAGE_KEY_REGS = 'eventflow_registrations_v1';
+      const STORAGE_KEY_SB = 'eventflow_supabase_cfg_v1';
+      const channel = ('BroadcastChannel' in window) ? new BroadcastChannel('eventflow_realtime_sync') : null;
+
+      // Optional: Pre-fill your public Supabase URL & Anon Key here if deploying across separate devices
+      const DEFAULT_SUPABASE_URL = '';
+      const DEFAULT_SUPABASE_ANON_KEY = '';
+
+      const DEFAULT_EVENTS = [
+        {
+          id: 'ev-tech-summit',
+          slug: 'tech-summit-2026',
+          title: 'Future Enterprise Tech Summit 2026',
+          subtitle: 'An executive symposium exploring cloud architecture, applied AI workflows, and resilient digital infrastructure.',
+          date: '14 Dec 2026 • 09:00 AM',
+          venue: 'KL Convention Centre, Hall 4',
+          capacity: 150,
+          company: {
+            name: 'Nexus Enterprise Solutions Sdn Bhd',
+            email: 'events@nexusenterprise.my',
+            address: 'Level 28, Menara Prestige, No. 1 Jalan Pinang, 50450 Kuala Lumpur, Wilayah Persekutuan Kuala Lumpur, Malaysia',
+            about: 'Leading enterprise digital transformation consultancy and organizer of executive technology forums across Southeast Asia.',
+            mapUrl: 'https://maps.google.com/?q=Menara+Prestige+Jalan+Pinang+Kuala+Lumpur'
+          },
+          itinerary: [
+            { time: '09:00 AM', title: 'Registration & Executive Networking Breakfast', speaker: 'Hospitality Team', room: 'Main Foyer' },
+            { time: '10:00 AM', title: 'Keynote: Sovereign Cloud & AI Infrastructure 2026', speaker: 'Dr. Farah Zulkifli (CTO)', room: 'Grand Ballroom A' },
+            { time: '11:30 AM', title: 'Panel: Scaling Zero-Trust Security Across Hybrid Teams', speaker: 'Industry CISO Panel', room: 'Grand Ballroom A' },
+            { time: '02:00 PM', title: 'Hands-On Workshop: Real-Time Data Pipelines', speaker: 'Marcus Tan, Principal Architect', room: 'Lab Suite 2' }
+          ],
+          collaterals: [
+            {
+              id: 'col-1',
+              title: 'Keynote Presentation Slides — Sovereign Cloud 2026',
+              type: 'PDF SLIDES',
+              size: '4.8 MB',
+              summary: 'Complete 24-slide keynote deck covering enterprise cloud migration blueprints and cost benchmarks.'
+            },
+            {
+              id: 'col-2',
+              title: 'Official Event Brochure & Floorplan',
+              type: 'PDF GUIDE',
+              size: '2.1 MB',
+              summary: 'Venue map, breakout room directory, Wi-Fi credentials, and speaker biographies.'
+            },
+            {
+              id: 'col-3',
+              title: 'Workshop Architecture Reference Deck',
+              type: 'PPTX / PDF',
+              size: '6.4 MB',
+              summary: 'Technical diagrams and reference architecture notes for the afternoon session.'
+            }
+          ]
+        },
+        {
+          id: 'ev-leadership-forum',
+          slug: 'leadership-forum-2026',
+          title: 'ASEAN Executive Leadership Forum',
+          subtitle: 'Strategic roundtables for C-suite leaders on sustainable growth, regional expansion, and talent transformation.',
+          date: '19 Jan 2027 • 01:30 PM',
+          venue: 'EQ Kuala Lumpur, Diamond Ballroom',
+          capacity: 80,
+          company: {
+            name: 'Nexus Enterprise Solutions Sdn Bhd',
+            email: 'leadership@nexusenterprise.my',
+            address: 'Level 28, Menara Prestige, No. 1 Jalan Pinang, 50450 Kuala Lumpur, Wilayah Persekutuan Kuala Lumpur, Malaysia',
+            about: 'Curating high-impact executive dialogues and regional leadership summits across ASEAN.',
+            mapUrl: 'https://maps.google.com/?q=EQ+Kuala+Lumpur'
+          },
+          itinerary: [
+            { time: '01:30 PM', title: 'Executive Check-In & Welcome Tea', speaker: 'Forum Secretariat', room: 'Diamond Foyer' },
+            { time: '02:15 PM', title: 'Opening Address: ASEAN Digital Economy Outlook', speaker: 'Dato’ Seri Razak Ahmad', room: 'Diamond Ballroom' },
+            { time: '03:45 PM', title: 'Fireside Chat: Building High-Velocity Product Teams', speaker: 'Elena Lim, VP of Strategy', room: 'Diamond Ballroom' }
+          ],
+          collaterals: [
+            {
+              id: 'col-lf-1',
+              title: 'ASEAN Digital Economy Report 2026/2027',
+              type: 'PDF SLIDES',
+              size: '5.3 MB',
+              summary: 'Macroeconomic insights, cross-border investment trends, and executive briefing slides.'
+            }
+          ]
+        }
+      ];
+
+      let state = {
+        publicPage: 'register',
+        activeEventSlug: 'tech-summit-2026',
+        events: [],
+        registrations: [],
+        activeCollateral: null,
+        supabaseClient: null
+      };
+
+      function loadEvents() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY_EVENTS);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          }
+        } catch (err) {}
+        return JSON.parse(JSON.stringify(DEFAULT_EVENTS));
+      }
+
+      function loadRegistrations() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY_REGS);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) return parsed;
+          }
+        } catch (err) {}
+        return [];
+      }
+
+      function saveRegistrations() {
+        try {
+          localStorage.setItem(STORAGE_KEY_REGS, JSON.stringify(state.registrations));
+          if (channel) {
+            channel.postMessage({ type: 'REGISTRATIONS_UPDATED', timestamp: Date.now() });
+          }
+        } catch (err) {}
+      }
+
+      function escapeHTML(str) {
+        return String(str || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      let toastTimer = null;
+      function showToast(msg) {
+        const banner = document.getElementById('toast-banner');
+        const textEl = document.getElementById('toast-message');
+        if (!banner || !textEl) return;
+        textEl.textContent = msg;
+        banner.classList.remove('hidden');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => banner.classList.add('hidden'), 2600);
+      }
+
+      function getActiveEvent() {
+        return state.events.find(e => e.slug === state.activeEventSlug) || state.events[0];
+      }
+
+      // Initialize Silent Background Supabase Client (Reads saved config, URL params, or hardcoded public keys)
+      function initSupabaseClient() {
+        try {
+          const params = new URLSearchParams(window.location.search);
+          let url = params.get('sb_url') || DEFAULT_SUPABASE_URL;
+          let key = params.get('sb_key') || DEFAULT_SUPABASE_ANON_KEY;
+
+          if (!url || !key) {
+            const raw = localStorage.getItem(STORAGE_KEY_SB);
+            if (raw) {
+              const cfg = JSON.parse(raw);
+              url = cfg.url || url;
+              key = cfg.key || key;
+            }
+          } else {
+            localStorage.setItem(STORAGE_KEY_SB, JSON.stringify({ url, key }));
+          }
+
+          if (url && key && window.supabase) {
+            state.supabaseClient = window.supabase.createClient(url.trim().replace(/\/+$/, ''), key.trim());
+          }
+        } catch (err) {}
+      }
+
+      async function pushRegistrationToCloud(reg) {
+        if (!state.supabaseClient) return;
+        try {
+          await state.supabaseClient.from('event_registrations').insert([{
+            id: reg.id,
+            event_slug: reg.eventSlug,
+            name: reg.name,
+            position: reg.position,
+            company: reg.company,
+            email: reg.email,
+            checked_in: false,
+            created_at: reg.createdAt
+          }]);
+        } catch (err) {}
+      }
+
+      function renderPublicView() {
+        const ev = getActiveEvent();
+        if (!ev) return;
+
+        const selector = document.getElementById('pub-event-selector');
+        if (selector) {
+          selector.innerHTML = state.events.map(item =>
+            `<option value="${escapeHTML(item.slug)}" ${item.slug === ev.slug ? 'selected' : ''}>${escapeHTML(item.title)}</option>`
+          ).join('');
+        }
+
+        const regCount = state.registrations.filter(r => r.eventSlug === ev.slug).length;
+        const remaining = Math.max(0, (ev.capacity || 100) - regCount);
+        document.getElementById('pub-spots-badge').textContent = `${remaining} Spots Left`;
+        document.getElementById('pub-event-slug-badge').textContent = `#${ev.slug}`;
+        document.getElementById('pub-event-title').textContent = ev.title;
+        document.getElementById('pub-event-subtitle').textContent = ev.subtitle;
+        document.getElementById('pub-event-date').textContent = ev.date;
+        document.getElementById('pub-event-venue').textContent = ev.venue;
+        document.getElementById('header-brand-title').textContent = ev.company?.name || 'Nexus Enterprise Events';
+
+        // Page 2: Itinerary
+        const itinList = document.getElementById('pub-itinerary-list');
+        if (itinList) {
+          itinList.innerHTML = (ev.itinerary || []).map(slot => `
+            <div class="matte-elevated rounded-2xl p-3.5 flex gap-3 items-start">
+              <div class="px-2.5 py-1 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] font-mono text-[11px] font-semibold shrink-0">
+                ${escapeHTML(slot.time)}
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="text-xs sm:text-sm font-bold leading-snug">${escapeHTML(slot.title)}</div>
+                <div class="text-[11px] text-[var(--ink-secondary)] mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                  <span>👤 ${escapeHTML(slot.speaker)}</span>
+                  <span>📍 ${escapeHTML(slot.room)}</span>
+                </div>
+              </div>
+            </div>
+          `).join('');
+        }
+
+        // Page 2: Collaterals
+        const colList = document.getElementById('pub-collaterals-list');
+        if (colList) {
+          colList.innerHTML = (ev.collaterals || []).map(col => `
+            <div class="matte-elevated rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                    ${escapeHTML(col.type)}
+                  </span>
+                  <span class="text-[11px] font-mono text-[var(--ink-muted)]">${escapeHTML(col.size)}</span>
+                </div>
+                <div class="text-xs sm:text-sm font-bold">${escapeHTML(col.title)}</div>
+                <p class="text-[11px] text-[var(--ink-secondary)] mt-0.5">${escapeHTML(col.summary)}</p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <button type="button" data-action="preview-collateral" data-col-id="${escapeHTML(col.id)}"
+                  class="px-3 py-2 rounded-xl matte-card text-xs font-semibold hover:opacity-80 transition">
+                  Preview
+                </button>
+                <button type="button" data-action="quick-download-col" data-col-id="${escapeHTML(col.id)}"
+                  class="px-3 py-2 rounded-xl btn-primary text-xs font-semibold !min-h-[34px]">
+                  Download
+                </button>
+              </div>
+            </div>
+          `).join('');
+        }
+
+        // Page 3: Company Info
+        const comp = ev.company || DEFAULT_EVENTS[0].company;
+        document.getElementById('pub-comp-name').textContent = comp.name;
+        document.getElementById('pub-comp-about').textContent = comp.about;
+        const emailLink = document.getElementById('pub-comp-email-link');
+        emailLink.textContent = comp.email;
+        emailLink.href = `mailto:${comp.email}`;
+        document.getElementById('pub-comp-address').textContent = comp.address;
+        document.getElementById('pub-comp-map-link').href = comp.mapUrl || `https://maps.google.com/?q=${encodeURIComponent(comp.address)}`;
+
+        // Active Page & Liquid Glass Pill State
+        ['register', 'itinerary', 'company'].forEach(p => {
+          const sec = document.getElementById(`pub-page-${p}`);
+          const btn = document.getElementById(`nav-pill-${p}`);
+          if (sec) sec.classList.toggle('hidden', state.publicPage !== p);
+          if (btn) btn.classList.toggle('active', state.publicPage === p);
+        });
+      }
+
+      function triggerCollateralDownload(col) {
+        if (!col) return;
+        const ev = getActiveEvent();
+        const content = [
+          `OFFICIAL EVENT COLLATERAL: ${col.title}`,
+          `Event: ${ev.title} (${ev.date})`,
+          `Venue: ${ev.venue}`,
+          `Organizer: ${ev.company.name} (${ev.company.email})`,
+          `--------------------------------------------------`,
+          col.summary,
+          ``,
+          `Event Itinerary:`,
+          ...(ev.itinerary || []).map(i => `- [${i.time}] ${i.title} (${i.speaker})`)
+        ].join('\n');
+
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${col.title.replace(/[^a-z0-9]+/gi, '_')}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast(`Downloaded "${col.title}"`);
+      }
+
+      function bindEvents() {
+        const regForm = document.getElementById('public-registration-form');
+        if (regForm) {
+          regForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const ev = getActiveEvent();
+            const name = document.getElementById('reg-name').value.trim();
+            const position = document.getElementById('reg-position').value.trim();
+            const company = document.getElementById('reg-company').value.trim();
+            const email = document.getElementById('reg-email').value.trim();
+
+            if (!name || !position || !company || !email) return;
+
+            const newReg = {
+              id: 'PASS-' + Math.floor(1000 + Math.random() * 9000),
+              eventSlug: ev.slug,
+              name,
+              position,
+              company,
+              email,
+              checkedIn: false,
+              createdAt: new Date().toISOString()
+            };
+
+            state.registrations.unshift(newReg);
+            saveRegistrations();
+            await pushRegistrationToCloud(newReg);
+
+            document.getElementById('conf-pass-id').textContent = `#${newReg.id}`;
+            document.getElementById('conf-name').textContent = newReg.name;
+            document.getElementById('conf-position').textContent = newReg.position;
+            document.getElementById('conf-company').textContent = newReg.company;
+            document.getElementById('conf-email').textContent = newReg.email;
+
+            regForm.classList.add('hidden');
+            document.getElementById('reg-confirmation-card').classList.remove('hidden');
+
+            renderPublicView();
+            showToast('Registration confirmed!');
+          });
+        }
+
+        const pubSelector = document.getElementById('pub-event-selector');
+        if (pubSelector) {
+          pubSelector.addEventListener('change', (e) => {
+            state.activeEventSlug = e.target.value;
+            const url = new URL(window.location.href);
+            url.searchParams.set('event', state.activeEventSlug);
+            window.history.replaceState({}, '', url);
+            renderPublicView();
+          });
+        }
+
+        document.addEventListener('click', (e) => {
+          const btn = e.target.closest('[data-action]');
+          if (!btn) return;
+          const action = btn.getAttribute('data-action');
+
+          if (action === 'switch-pub-page') {
+            state.publicPage = btn.getAttribute('data-page');
+            renderPublicView();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          } else if (action === 'reset-reg-form') {
+            document.getElementById('public-registration-form').reset();
+            document.getElementById('public-registration-form').classList.remove('hidden');
+            document.getElementById('reg-confirmation-card').classList.add('hidden');
+          } else if (action === 'preview-collateral') {
+            const ev = getActiveEvent();
+            const col = (ev.collaterals || []).find(c => c.id === btn.getAttribute('data-col-id'));
+            if (col) {
+              state.activeCollateral = col;
+              document.getElementById('modal-col-type').textContent = col.type;
+              document.getElementById('modal-col-title').textContent = col.title;
+              document.getElementById('modal-col-size').textContent = col.size;
+              document.getElementById('modal-col-slide-heading').textContent = col.title;
+              document.getElementById('modal-col-summary').textContent = col.summary;
+              document.getElementById('collateral-modal').classList.remove('hidden');
+            }
+          } else if (action === 'download-collateral-file') {
+            triggerCollateralDownload(state.activeCollateral);
+          } else if (action === 'quick-download-col') {
+            const ev = getActiveEvent();
+            const col = (ev.collaterals || []).find(c => c.id === btn.getAttribute('data-col-id'));
+            triggerCollateralDownload(col);
+          } else if (action === 'copy-text') {
+            const targetEl = document.getElementById(btn.getAttribute('data-copy-target'));
+            if (targetEl) {
+              const ta = document.createElement('textarea');
+              ta.value = targetEl.textContent.trim();
+              document.body.appendChild(ta);
+              ta.select();
+              document.execCommand('copy');
+              document.body.removeChild(ta);
+              showToast('Copied to clipboard');
+            }
+          } else if (action === 'close-modal') {
+            document.getElementById('collateral-modal').classList.add('hidden');
+          }
+        });
+
+        // Listen for Admin event updates in real time
+        if (channel) {
+          channel.onmessage = () => {
+            state.events = loadEvents();
+            state.registrations = loadRegistrations();
+            renderPublicView();
+          };
+        }
+        window.addEventListener('storage', (e) => {
+          if (e.key === STORAGE_KEY_EVENTS || e.key === STORAGE_KEY_REGS) {
+            state.events = loadEvents();
+            state.registrations = loadRegistrations();
+            renderPublicView();
+          }
+        });
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        state.events = loadEvents();
+        state.registrations = loadRegistrations();
+
+        const params = new URLSearchParams(window.location.search);
+        const slugParam = params.get('event');
+        if (slugParam && state.events.some(e => e.slug === slugParam)) {
+          state.activeEventSlug = slugParam;
+        } else if (state.events.length > 0) {
+          state.activeEventSlug = state.events[0].slug;
+        }
+
+        initSupabaseClient();
+        bindEvents();
+        renderPublicView();
+      });
+    })();
+  </script>
+</body>
+</html>
