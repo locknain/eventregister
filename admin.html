@@ -312,6 +312,10 @@
             class="px-3 py-2 rounded-xl matte-elevated text-xs font-semibold hover:opacity-80 transition">
             Copy Table SQL
           </button>
+          <button type="button" id="sb-disconnect-btn" data-action="disconnect-supabase"
+            class="hidden px-3 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-semibold hover:bg-rose-500/20 transition">
+            Disconnect
+          </button>
         </div>
       </div>
     </div>
@@ -420,38 +424,42 @@ notify pgrst, 'reload schema';`;
         filterEvent: 'ALL',
         search: '',
         supabaseClient: null,
+        supabaseChannel: null,
         supabaseConnected: false,
         sbUrl: '',
         sbKey: ''
       };
 
-      function loadArrayJSON(key) {
+      function loadJSON(key, fallback) {
         try {
           const raw = localStorage.getItem(key);
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) return parsed;
-          }
-        } catch (e) {}
-        return [];
+          return raw ? JSON.parse(raw) : fallback;
+        } catch (err) {
+          return fallback;
+        }
+      }
+
+      function saveJSON(key, value) {
+        try {
+          localStorage.setItem(key, JSON.stringify(value));
+        } catch (err) {}
       }
 
       function escapeHTML(str) {
-        return String(str || '').replace(/[&<>"']/g, m => ({
-          '&': '&amp;',
-          '<': '&lt;',
-          '>': '&gt;',
-          '"': '&quot;',
-          "'": '&#39;'
-        }[m]));
+        return String(str || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
       }
 
       let toastTimer = null;
       function showToast(msg) {
         const banner = document.getElementById('toast-banner');
-        const label = document.getElementById('toast-message');
-        if (!banner || !label) return;
-        label.textContent = msg;
+        const textEl = document.getElementById('toast-message');
+        if (!banner || !textEl) return;
+        textEl.textContent = msg;
         banner.classList.remove('hidden');
         clearTimeout(toastTimer);
         toastTimer = setTimeout(() => banner.classList.add('hidden'), 2600);
@@ -476,21 +484,21 @@ notify pgrst, 'reload schema';`;
         const q = state.search.trim().toLowerCase();
         const filtered = state.registrations.filter(r => {
           const matchesEvent = state.filterEvent === 'ALL' || r.eventSlug === state.filterEvent;
-          const matchesSearch = !q || [r.name, r.position, r.company, r.email].some(v => (v || '').toLowerCase().includes(q));
+          const matchesSearch = !q || [r.name, r.position, r.company, r.email, r.eventSlug]
+            .some(val => (val || '').toLowerCase().includes(q));
           return matchesEvent && matchesSearch;
         });
 
-        // Update 4 KPI Cards
+        // Update KPI Cards
         document.getElementById('kpi-total-reg').textContent = filtered.length;
-        const uniqueCompanies = new Set(
+        document.getElementById('kpi-unique-comp').textContent = new Set(
           filtered.map(r => (r.company || '').trim().toLowerCase()).filter(Boolean)
         ).size;
-        document.getElementById('kpi-unique-comp').textContent = uniqueCompanies;
         document.getElementById('kpi-checked-in').textContent = filtered.filter(r => r.checkedIn).length;
         document.getElementById('kpi-active-events').textContent = state.events.length;
         document.getElementById('table-count-label').textContent = `${filtered.length} ${filtered.length === 1 ? 'entry' : 'entries'}`;
 
-        // Render Registrants Table
+        // Render Table Rows
         const tbody = document.getElementById('admin-registrants-tbody');
         const emptyState = document.getElementById('admin-empty-state');
 
@@ -501,36 +509,41 @@ notify pgrst, 'reload schema';`;
         }
 
         emptyState.classList.add('hidden');
-        tbody.innerHTML = filtered.map(r => `
-          <tr class="hover:bg-[var(--bg-elevated)]/60 transition">
-            <td class="py-3 px-4">
-              <div class="font-bold text-[var(--ink-primary)]">${escapeHTML(r.name)}</div>
-              <div class="font-mono text-[11px] text-[var(--ink-secondary)]">${escapeHTML(r.email)}</div>
-            </td>
-            <td class="py-3 px-4 font-medium">${escapeHTML(r.position)}</td>
-            <td class="py-3 px-4">
-              <span class="px-2 py-0.5 rounded-lg matte-elevated font-medium">${escapeHTML(r.company)}</span>
-            </td>
-            <td class="py-3 px-4 font-mono text-[11px] text-[var(--ink-secondary)]">${escapeHTML(r.eventSlug)}</td>
-            <td class="py-3 px-4 font-mono text-[11px] text-[var(--ink-muted)]">
-              ${new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </td>
-            <td class="py-3 px-4 text-right whitespace-nowrap">
-              <button type="button" data-action="toggle-checkin" data-reg-id="${escapeHTML(r.id)}"
-                class="px-2.5 py-1 rounded-lg text-[11px] font-semibold mr-1 transition ${r.checkedIn ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'matte-elevated hover:opacity-80'}">
-                ${r.checkedIn ? '✓ Checked In' : 'Check In'}
-              </button>
-              <button type="button" data-action="delete-reg" data-reg-id="${escapeHTML(r.id)}"
-                class="px-2 py-1 rounded-lg text-[11px] font-semibold text-rose-500 hover:bg-rose-500/10 transition"
-                title="Remove entry">✕</button>
-            </td>
-          </tr>
-        `).join('');
+        tbody.innerHTML = filtered.map(r => {
+          const timeStr = r.createdAt
+            ? new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : '--:--';
+          return `
+            <tr class="hover:bg-[var(--bg-elevated)]/60 transition">
+              <td class="py-3 px-4">
+                <div class="font-bold text-[var(--ink-primary)]">${escapeHTML(r.name)}</div>
+                <div class="font-mono text-[11px] text-[var(--ink-secondary)]">${escapeHTML(r.email)}</div>
+              </td>
+              <td class="py-3 px-4 font-medium">${escapeHTML(r.position)}</td>
+              <td class="py-3 px-4">
+                <span class="px-2 py-0.5 rounded-lg matte-elevated font-medium">${escapeHTML(r.company)}</span>
+              </td>
+              <td class="py-3 px-4 font-mono text-[11px] text-[var(--ink-secondary)]">${escapeHTML(r.eventSlug)}</td>
+              <td class="py-3 px-4 font-mono text-[11px] text-[var(--ink-muted)]">${escapeHTML(timeStr)}</td>
+              <td class="py-3 px-4 text-right whitespace-nowrap">
+                <button type="button" data-action="toggle-checkin" data-reg-id="${escapeHTML(r.id)}"
+                  class="px-2.5 py-1 rounded-lg text-[11px] font-semibold mr-1 transition ${r.checkedIn ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'matte-elevated hover:opacity-80'}">
+                  ${r.checkedIn ? '✓ Checked In' : 'Check In'}
+                </button>
+                <button type="button" data-action="delete-reg" data-reg-id="${escapeHTML(r.id)}"
+                  class="px-2 py-1 rounded-lg text-[11px] font-semibold text-rose-500 hover:bg-rose-500/10 transition">
+                  ✕
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
       }
 
       async function connectSupabase(rawUrl, rawKey, silent = false) {
         const errBox = document.getElementById('sb-error-box');
         errBox.classList.add('hidden');
+
         const url = (rawUrl || '').trim().replace(/\/+$/, '');
         const key = (rawKey || '').trim();
 
@@ -542,6 +555,12 @@ notify pgrst, 'reload schema';`;
 
         try {
           if (!window.supabase) throw new Error('Supabase client library failed to load.');
+          if (state.supabaseClient && state.supabaseChannel) {
+            try {
+              await state.supabaseClient.removeChannel(state.supabaseChannel);
+            } catch (cleanupErr) {}
+          }
+
           const client = window.supabase.createClient(url, key);
           const { data, error } = await client
             .from('event_registrations')
@@ -554,7 +573,7 @@ notify pgrst, 'reload schema';`;
           state.supabaseConnected = true;
           state.sbUrl = url;
           state.sbKey = key;
-          localStorage.setItem(STORAGE_KEY_SB, JSON.stringify({ url, key }));
+          saveJSON(STORAGE_KEY_SB, { url, key });
 
           if (Array.isArray(data)) {
             state.registrations = data.map(row => ({
@@ -567,11 +586,11 @@ notify pgrst, 'reload schema';`;
               checkedIn: !!row.checked_in,
               createdAt: row.created_at
             }));
-            localStorage.setItem(STORAGE_KEY_REGS, JSON.stringify(state.registrations));
+            saveJSON(STORAGE_KEY_REGS, state.registrations);
           }
 
           // Subscribe to Real-Time Inserts / Updates / Deletes
-          client.channel('public:event_registrations')
+          state.supabaseChannel = client.channel('public:event_registrations')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'event_registrations' }, async () => {
               const { data: fresh } = await client
                 .from('event_registrations')
@@ -588,7 +607,7 @@ notify pgrst, 'reload schema';`;
                   checkedIn: !!row.checked_in,
                   createdAt: row.created_at
                 }));
-                localStorage.setItem(STORAGE_KEY_REGS, JSON.stringify(state.registrations));
+                saveJSON(STORAGE_KEY_REGS, state.registrations);
                 renderDashboard();
                 showToast('New live registration received!');
               }
@@ -598,6 +617,7 @@ notify pgrst, 'reload schema';`;
           document.getElementById('sb-status-text').textContent = 'SUPABASE LIVE';
           document.getElementById('sb-status-dot').className = 'w-1.5 h-1.5 rounded-full bg-emerald-500 live-dot';
           document.getElementById('sb-btn-dot').className = 'w-2 h-2 rounded-full bg-emerald-500';
+          document.getElementById('sb-disconnect-btn').classList.remove('hidden');
 
           if (!silent) {
             document.getElementById('supabase-modal').classList.add('hidden');
@@ -610,27 +630,59 @@ notify pgrst, 'reload schema';`;
         }
       }
 
+      async function disconnectSupabase() {
+        if (state.supabaseClient && state.supabaseChannel) {
+          try {
+            await state.supabaseClient.removeChannel(state.supabaseChannel);
+          } catch (err) {}
+        }
+
+        state.supabaseClient = null;
+        state.supabaseChannel = null;
+        state.supabaseConnected = false;
+        state.sbUrl = '';
+        state.sbKey = '';
+
+        try {
+          localStorage.removeItem(STORAGE_KEY_SB);
+        } catch (err) {}
+
+        document.getElementById('sb-url-input').value = '';
+        document.getElementById('sb-key-input').value = '';
+        document.getElementById('sb-error-box').classList.add('hidden');
+        document.getElementById('sb-disconnect-btn').classList.add('hidden');
+
+        document.getElementById('sb-status-text').textContent = 'LOCAL MODE';
+        document.getElementById('sb-status-dot').className = 'w-1.5 h-1.5 rounded-full bg-amber-500 live-dot';
+        document.getElementById('sb-btn-dot').className = 'w-2 h-2 rounded-full bg-amber-500';
+
+        document.getElementById('supabase-modal').classList.add('hidden');
+        renderDashboard();
+        showToast('Disconnected from Supabase (Local Mode)');
+      }
+
       document.addEventListener('DOMContentLoaded', async () => {
-        // Load stored events & registrations without injecting any pre-filled sample data
-        state.events = loadArrayJSON(STORAGE_KEY_EVENTS);
-        state.registrations = loadArrayJSON(STORAGE_KEY_REGS);
+        state.events = loadJSON(STORAGE_KEY_EVENTS, []);
+        state.registrations = loadJSON(STORAGE_KEY_REGS, []);
 
-        // Login Form Handler
-        document.getElementById('admin-login-form').addEventListener('submit', (e) => {
-          e.preventDefault();
-          const val = document.getElementById('admin-credential-input').value.trim();
-          if (val === '1234' || val === 'admin123') {
-            sessionStorage.setItem(ADMIN_SESSION_KEY, 'true');
-            document.getElementById('admin-login-error').classList.add('hidden');
-            document.getElementById('admin-credential-input').value = '';
-            renderDashboard();
-            showToast('Admin Console Unlocked');
-          } else {
-            document.getElementById('admin-login-error').classList.remove('hidden');
-          }
-        });
+        // Login Gate Handler
+        const loginForm = document.getElementById('admin-login-form');
+        if (loginForm) {
+          loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const val = document.getElementById('admin-credential-input').value.trim();
+            if (val === '1234' || val === 'admin123') {
+              sessionStorage.setItem(ADMIN_SESSION_KEY, 'true');
+              document.getElementById('admin-login-error').classList.add('hidden');
+              document.getElementById('admin-credential-input').value = '';
+              renderDashboard();
+            } else {
+              document.getElementById('admin-login-error').classList.remove('hidden');
+            }
+          });
+        }
 
-        // Filter & Search Listeners
+        // Event Filter & Search Handlers
         document.getElementById('admin-event-filter').addEventListener('change', (e) => {
           state.filterEvent = e.target.value;
           renderDashboard();
@@ -647,9 +699,10 @@ notify pgrst, 'reload schema';`;
           const title = document.getElementById('new-ev-title').value.trim();
           const date = document.getElementById('new-ev-date').value.trim();
           const venue = document.getElementById('new-ev-venue').value.trim();
-          const subtitle = document.getElementById('new-ev-subtitle').value.trim() || 'Official event registration portal.';
-          const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Math.floor(100 + Math.random() * 900);
+          const subtitle = document.getElementById('new-ev-subtitle').value.trim() || 'Official event registration.';
+          if (!title) return;
 
+          const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Math.floor(100 + Math.random() * 900);
           state.events.unshift({
             id: 'ev-' + Date.now(),
             slug,
@@ -657,25 +710,19 @@ notify pgrst, 'reload schema';`;
             subtitle,
             date,
             venue,
-            capacity: 120,
+            capacity: 150,
             company: {
               name: 'Nexus Enterprise Solutions Sdn Bhd',
               email: 'events@nexusenterprise.my',
-              address: 'Level 28, Menara Prestige, No. 1 Jalan Pinang, 50450 Kuala Lumpur, Malaysia',
+              address: 'Level 28, Menara Prestige, Kuala Lumpur',
               about: 'Enterprise Event Organizer.'
             },
-            itinerary: [
-              { time: '09:00 AM', title: 'Registration & Opening Keynote', speaker: 'Host Team', room: venue }
-            ],
-            collaterals: [
-              { id: 'col-' + Date.now(), title: `${title} — Presentation Slides`, type: 'PDF SLIDES', size: '3.2 MB', summary: 'Official session slides and schedule.' }
-            ]
+            itinerary: [{ time: '09:00 AM', title: 'Registration & Opening', speaker: 'Host Team', room: venue }],
+            collaterals: [{ id: 'col-' + Date.now(), title: `${title} — Presentation Slides`, type: 'PDF SLIDES', size: '3.2 MB', summary: 'Official session slides.' }]
           });
 
-          try {
-            localStorage.setItem(STORAGE_KEY_EVENTS, JSON.stringify(state.events));
-            if (channel) channel.postMessage({ type: 'EVENTS_UPDATED' });
-          } catch (err) {}
+          saveJSON(STORAGE_KEY_EVENTS, state.events);
+          if (channel) channel.postMessage({ type: 'EVENTS_UPDATED', timestamp: Date.now() });
 
           document.getElementById('event-modal').classList.add('hidden');
           e.target.reset();
@@ -683,13 +730,15 @@ notify pgrst, 'reload schema';`;
           showToast('New event published!');
         });
 
-        // Global Delegated Button Handler
+        // Delegated Click Actions
         document.addEventListener('click', async (e) => {
           const btn = e.target.closest('[data-action]');
           if (!btn) return;
           const act = btn.getAttribute('data-action');
 
           if (act === 'open-supabase-modal') {
+            const hasSavedOrConnected = state.supabaseConnected || Boolean(localStorage.getItem(STORAGE_KEY_SB));
+            document.getElementById('sb-disconnect-btn').classList.toggle('hidden', !hasSavedOrConnected);
             document.getElementById('supabase-modal').classList.remove('hidden');
           } else if (act === 'open-event-modal') {
             document.getElementById('event-modal').classList.remove('hidden');
@@ -712,14 +761,14 @@ notify pgrst, 'reload schema';`;
               document.getElementById('sb-url-input').value,
               document.getElementById('sb-key-input').value
             );
+          } else if (act === 'disconnect-supabase') {
+            await disconnectSupabase();
           } else if (act === 'copy-event-share-link') {
-            const slug = state.filterEvent !== 'ALL' ? state.filterEvent : (state.events[0]?.slug || '');
+            const slug = state.filterEvent !== 'ALL' ? state.filterEvent : (state.events[0]?.slug || 'tech-summit-2026');
             const base = window.location.href.replace(/admin\.html.*$/, 'index.html');
             const u = new URL(base);
-            if (slug) {
-              u.searchParams.set('event', slug);
-            }
-            if (state.supabaseConnected) {
+            u.searchParams.set('event', slug);
+            if (state.supabaseConnected && state.sbUrl && state.sbKey) {
               u.searchParams.set('sb_url', state.sbUrl);
               u.searchParams.set('sb_key', state.sbKey);
             }
@@ -739,37 +788,25 @@ notify pgrst, 'reload schema';`;
                   .join(',')
               )
             ];
-            const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url;
-            a.download = 'Registrants.csv';
-            document.body.appendChild(a);
+            a.href = URL.createObjectURL(new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' }));
+            a.download = 'EventFlow_Registrants.csv';
             a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            showToast('Exported Registrants.csv');
+            showToast('Exported CSV');
           } else if (act === 'toggle-checkin') {
             const reg = state.registrations.find(x => x.id === btn.getAttribute('data-reg-id'));
             if (reg) {
               reg.checkedIn = !reg.checkedIn;
-              try {
-                localStorage.setItem(STORAGE_KEY_REGS, JSON.stringify(state.registrations));
-                if (channel) channel.postMessage({ type: 'REGISTRATIONS_UPDATED' });
-              } catch (err) {}
+              saveJSON(STORAGE_KEY_REGS, state.registrations);
               if (state.supabaseConnected && state.supabaseClient) {
                 await state.supabaseClient.from('event_registrations').update({ checked_in: reg.checkedIn }).eq('id', reg.id);
               }
               renderDashboard();
-              showToast(reg.checkedIn ? `${reg.name} checked in` : 'Check-in reverted');
             }
           } else if (act === 'delete-reg') {
             const id = btn.getAttribute('data-reg-id');
             state.registrations = state.registrations.filter(x => x.id !== id);
-            try {
-              localStorage.setItem(STORAGE_KEY_REGS, JSON.stringify(state.registrations));
-              if (channel) channel.postMessage({ type: 'REGISTRATIONS_UPDATED' });
-            } catch (err) {}
+            saveJSON(STORAGE_KEY_REGS, state.registrations);
             if (state.supabaseConnected && state.supabaseClient) {
               await state.supabaseClient.from('event_registrations').delete().eq('id', id);
             }
@@ -778,19 +815,19 @@ notify pgrst, 'reload schema';`;
           }
         });
 
-        // Listen for Live Registrations from index.html
+        // Cross-Tab Sync Listener
         if (channel) {
           channel.onmessage = () => {
-            state.events = loadArrayJSON(STORAGE_KEY_EVENTS);
-            state.registrations = loadArrayJSON(STORAGE_KEY_REGS);
+            state.events = loadJSON(STORAGE_KEY_EVENTS, state.events);
+            state.registrations = loadJSON(STORAGE_KEY_REGS, state.registrations);
             renderDashboard();
-            showToast('Live registration synced!');
           };
         }
+
         window.addEventListener('storage', (e) => {
           if (e.key === STORAGE_KEY_EVENTS || e.key === STORAGE_KEY_REGS) {
-            state.events = loadArrayJSON(STORAGE_KEY_EVENTS);
-            state.registrations = loadArrayJSON(STORAGE_KEY_REGS);
+            state.events = loadJSON(STORAGE_KEY_EVENTS, state.events);
+            state.registrations = loadJSON(STORAGE_KEY_REGS, state.registrations);
             renderDashboard();
           }
         });
@@ -803,6 +840,7 @@ notify pgrst, 'reload schema';`;
             if (savedSb && savedSb.url && savedSb.key) {
               document.getElementById('sb-url-input').value = savedSb.url;
               document.getElementById('sb-key-input').value = savedSb.key;
+              document.getElementById('sb-disconnect-btn').classList.remove('hidden');
               await connectSupabase(savedSb.url, savedSb.key, true);
             }
           }
